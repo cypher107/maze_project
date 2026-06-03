@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>迷宫求解系统</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #1a1a2e; color: #eee; display: flex; height: 100vh; overflow: hidden; }
+#sidebar { width: 340px; background: #16213e; padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; border-right: 2px solid #0f3460; }
+#main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
+canvas { border-radius: 8px; box-shadow: 0 0 40px rgba(233,69,96,0.3); }
+h1 { font-size: 22px; text-align: center; color: #e94560; margin-bottom: 4px; }
+h2 { font-size: 14px; text-align: center; color: #888; font-weight: normal; margin-bottom: 8px; }
+.btn { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; width: 100%; }
+.btn:hover { transform: translateY(-1px); opacity: 0.9; }
+.btn-load { background: #0f3460; color: #e94560; border: 1px solid #e94560; }
+.btn-dfs { background: #533483; color: #fff; }
+.btn-bfs { background: #1a508b; color: #fff; }
+.btn-turns { background: #0d7b6e; color: #fff; }
+.btn-eval { background: #e94560; color: #fff; }
+.file-input { width: 100%; padding: 8px; background: #0f3460; border: 1px solid #333; border-radius: 6px; color: #ccc; font-size: 13px; }
+.label { font-size: 12px; color: #888; margin-bottom: 2px; }
+.stats { background: #0f3460; border-radius: 8px; padding: 14px; }
+.stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #1a1a3e; }
+.stat-row:last-child { border: none; }
+.stat-val { color: #e94560; font-weight: bold; }
+.path-list { max-height: 200px; overflow-y: auto; font-size: 12px; }
+.path-item { padding: 6px 10px; cursor: pointer; border-radius: 4px; margin: 2px 0; background: #0f3460; }
+.path-item:hover { background: #1a508b; }
+.path-item.active { background: #e94560; color: #fff; }
+.legend { display: flex; gap: 12px; font-size: 11px; justify-content: center; flex-wrap: wrap; }
+.legend span { display: flex; align-items: center; gap: 4px; }
+.leg-wall { width: 14px; height: 14px; background: #333; border-radius: 2px; }
+.leg-path { width: 14px; height: 14px; background: #e94560; border-radius: 2px; }
+.leg-entry { width: 14px; height: 14px; background: #4ecca3; border-radius: 2px; }
+.leg-exit { width: 14px; height: 14px; background: #f0a500; border-radius: 2px; }
+.leg-empty { width: 14px; height: 14px; background: #f8f8f8; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>迷宫求解系统</h1>
+  <h2>算法与数据结构 B · 期末作业</h2>
+
+  <div>
+    <div class="label">迷宫文件</div>
+    <input class="file-input" id="filePath" value="mazes/maze1.txt" placeholder="输入迷宫文件路径">
+  </div>
+
+  <button class="btn btn-load" onclick="loadMaze()">加载迷宫</button>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <button class="btn btn-dfs" onclick="solveDFS()">DFS 所有路径</button>
+    <button class="btn btn-bfs" onclick="solveBFS()">BFS 最短路径</button>
+    <button class="btn btn-turns" onclick="solveFewestTurns()">最少转弯路径</button>
+    <button class="btn btn-eval" onclick="evaluate()">综合评价</button>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat-row"><span>状态</span><span class="stat-val" id="status">就绪</span></div>
+    <div class="stat-row"><span>迷宫尺寸</span><span class="stat-val" id="size">-</span></div>
+    <div class="stat-row"><span>路径数量</span><span class="stat-val" id="pathCount">-</span></div>
+    <div class="stat-row"><span>当前步数</span><span class="stat-val" id="steps">-</span></div>
+    <div class="stat-row"><span>转弯次数</span><span class="stat-val" id="turns">-</span></div>
+  </div>
+
+  <div class="path-list" id="pathList"></div>
+
+  <div class="legend">
+    <span><span class="leg-wall"></span>墙壁</span>
+    <span><span class="leg-path"></span>路径</span>
+    <span><span class="leg-entry"></span>入口</span>
+    <span><span class="leg-exit"></span>出口</span>
+    <span><span class="leg-empty"></span>通道</span>
+  </div>
+</div>
+
+<div id="main">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let mazeData = null;
+let currentPath = null;
+let allPaths = [];
+let cellSize = 40;
+
+function setStatus(s) { document.getElementById('status').textContent = s; }
+
+async function loadMaze() {
+  const file = document.getElementById('filePath').value;
+  setStatus('加载中...');
+  try {
+    const r = await fetch('/api/load', { method: 'POST', body: file });
+    mazeData = await r.json();
+    if (mazeData.error) { setStatus('加载失败'); return; }
+    currentPath = null; allPaths = [];
+    document.getElementById('size').textContent = mazeData.rows + 'x' + mazeData.cols;
+    document.getElementById('pathList').innerHTML = '';
+    updateStats();
+    resizeCanvas();
+    draw();
+    setStatus('已加载');
+  } catch(e) {
+    setStatus('连接失败 - 请确保服务器在运行');
+  }
+}
+
+async function solveDFS() {
+  if (!mazeData) return;
+  setStatus('DFS 求解中...');
+  const r = await fetch('/api/solve/dfs');
+  const data = await r.json();
+  allPaths = data.paths || [];
+  document.getElementById('pathCount').textContent = data.total || 0;
+  renderPathList();
+  if (allPaths.length > 0) selectPath(0);
+  setStatus('DFS 完成');
+}
+
+async function solveBFS() {
+  if (!mazeData) return;
+  setStatus('BFS 求解中...');
+  const r = await fetch('/api/solve/bfs');
+  const data = await r.json();
+  if (!data.error) {
+    currentPath = data; allPaths = [data];
+    document.getElementById('pathCount').textContent = '1 (最短)';
+    renderPathList();
+    selectPath(0);
+  }
+  setStatus('BFS 完成');
+}
+
+async function solveFewestTurns() {
+  if (!mazeData) return;
+  setStatus('0-1 BFS 求解中...');
+  const r = await fetch('/api/solve/fewest-turns');
+  const data = await r.json();
+  if (!data.error) {
+    currentPath = data; allPaths = [data];
+    document.getElementById('pathCount').textContent = '1 (最少转弯)';
+    renderPathList();
+    selectPath(0);
+  }
+  setStatus('0-1 BFS 完成');
+}
+
+async function evaluate() {
+  if (!mazeData) return;
+  setStatus('综合评价中...');
+  const r = await fetch('/api/evaluate');
+  const data = await r.json();
+  allPaths = [data.shortest, data.fewestTurns].filter(p => p && p.points);
+  document.getElementById('pathCount').textContent = data.totalPaths;
+  renderPathList();
+  if (allPaths.length > 0) selectPath(0);
+  setStatus('评价完成');
+}
+
+function renderPathList() {
+  const div = document.getElementById('pathList');
+  div.innerHTML = allPaths.map((p, i) =>
+    `<div class="path-item" onclick="selectPath(${i})">路径${i+1}: ${p.steps}步 ${p.turns}转</div>`
+  ).join('');
+}
+
+function selectPath(i) {
+  currentPath = allPaths[i];
+  document.querySelectorAll('.path-item').forEach((el, j) => el.classList.toggle('active', j === i));
+  updateStats();
+  draw();
+}
+
+function updateStats() {
+  document.getElementById('steps').textContent = currentPath ? currentPath.steps : '-';
+  document.getElementById('turns').textContent = currentPath ? currentPath.turns : '-';
+}
+
+function resizeCanvas() {
+  if (!mazeData) return;
+  const maxW = window.innerWidth - 380;
+  const maxH = window.innerHeight - 40;
+  cellSize = Math.floor(Math.min(maxW / mazeData.cols, maxH / mazeData.rows));
+  cellSize = Math.max(cellSize, 8);
+  cellSize = Math.min(cellSize, 60);
+  canvas.width = cellSize * mazeData.cols;
+  canvas.height = cellSize * mazeData.rows;
+}
+
+function draw() {
+  if (!mazeData) return;
+  const { rows, cols, grid, entry, exit } = mazeData;
+  const pathSet = new Set();
+  if (currentPath && currentPath.points) {
+    currentPath.points.forEach(p => pathSet.add(p[0] + ',' + p[1]));
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const x = j * cellSize, y = i * cellSize;
+      if (grid[i][j] === 1) {
+        ctx.fillStyle = '#333';
+        ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+      } else {
+        const onPath = pathSet.has(i + ',' + j);
+        ctx.fillStyle = onPath ? '#e94560' : '#f8f8f8';
+        ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+      }
+    }
+  }
+
+  // entry
+  ctx.fillStyle = '#4ecca3';
+  ctx.fillRect(entry[1] * cellSize + 2, entry[0] * cellSize + 2, cellSize - 4, cellSize - 4);
+  // exit
+  ctx.fillStyle = '#f0a500';
+  ctx.fillRect(exit[1] * cellSize + 2, exit[0] * cellSize + 2, cellSize - 4, cellSize - 4);
+
+  // arrows on path
+  if (currentPath && currentPath.points && currentPath.points.length > 1 && cellSize >= 20) {
+    const pts = currentPath.points;
+    for (let k = 0; k < pts.length - 1; k++) {
+      const cx = pts[k][1] * cellSize + cellSize / 2;
+      const cy = pts[k][0] * cellSize + cellSize / 2;
+      const nx = pts[k+1][1] * cellSize + cellSize / 2;
+      const ny = pts[k+1][0] * cellSize + cellSize / 2;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(nx, ny);
+      ctx.stroke();
+    }
+  }
+
+  // labels inside entry/exit
+  if (cellSize >= 30) {
+    ctx.fillStyle = '#fff';
+    ctx.font = `${cellSize*0.35}px 'Microsoft YaHei'`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('入', entry[1]*cellSize+cellSize/2, entry[0]*cellSize+cellSize/2);
+    ctx.fillText('出', exit[1]*cellSize+cellSize/2, exit[0]*cellSize+cellSize/2);
+  }
+}
+
+window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+window.onload = () => loadMaze();
+</script>
+</body>
+</html>

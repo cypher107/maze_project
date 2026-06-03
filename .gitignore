@@ -1,0 +1,17 @@
+build/
+*.o
+*.obj
+*.exe
+maze_gui_autogen/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.pro.user
+*.autogen
+mocs_compilation.cpp
+moc_predefs.h
+qt-mingw-libs/
+__pycache__/
+*.pyc
+translations/
