@@ -589,7 +589,17 @@ void MainWindow::onRunSolver(int algorithm, int entryIdx, int exitIdx, bool anim
     QApplication::processEvents();
 
     if (algorithm == 5) {
-        // Compare mode
+        // Compare mode — 有关卡时统一用关卡求解
+        if (!mMaze.getCheckpoints().empty()) {
+            Path cpPath = solveOptimalCheckpoints(mMaze, entryIdx, exitIdx);
+            mCanvas->addComparePath(&cpPath, QColor(233, 69, 96), "关卡最优路径");
+            mCanvas->update();
+            mPanel->setStats("关卡对比完成",
+                cpPath.steps, cpPath.turns, cpPath.totalCost, 1);
+            statusBar()->showMessage("关卡对比完成 - 红色:关卡最优路径");
+            return;
+        }
+
         Path bfsPath = bfsFindShortestPath(mMaze, entryIdx, exitIdx);
         Path turnsPath = bfsFindFewestTurnsPath(mMaze, entryIdx, exitIdx);
         Path dijPath = dijkstraFindPath(mMaze, entryIdx, exitIdx);
@@ -613,34 +623,42 @@ void MainWindow::onRunSolver(int algorithm, int entryIdx, int exitIdx, bool anim
 void MainWindow::runAlgorithm(int algo, int entryIdx, int exitIdx, bool animated) {
     Path result;
 
-    switch (algo) {
-    case 0: { // DFS
-        std::vector<Path> all = dfsFindAllPaths(mMaze, entryIdx, exitIdx, 500);
-        if (!all.empty()) {
-            result = all[0];
-            for (const auto& p : all) {
-                if (p.steps < result.steps) result = p;
+    // 如果有关卡点，先求解关卡顺序（最优排列），再跑指定算法
+    if (!mMaze.getCheckpoints().empty()) {
+        result = solveOptimalCheckpoints(mMaze, entryIdx, exitIdx);
+        QStringList algoNames = {"DFS", "BFS", "0-1 BFS", "Dijkstra", "A*"};
+        mPanel->setStats("关卡+" + algoNames[algo] + "完成",
+                         result.steps, result.turns, result.totalCost, 1);
+    } else {
+        switch (algo) {
+        case 0: { // DFS
+            std::vector<Path> all = dfsFindAllPaths(mMaze, entryIdx, exitIdx, 500);
+            if (!all.empty()) {
+                result = all[0];
+                for (const auto& p : all) {
+                    if (p.steps < result.steps) result = p;
+                }
             }
+            mPanel->setStats("DFS完成", result.steps, result.turns, result.totalCost, (int)all.size());
+            break;
         }
-        mPanel->setStats("DFS完成", result.steps, result.turns, result.totalCost, (int)all.size());
-        break;
-    }
-    case 1: // BFS
-        result = bfsFindShortestPath(mMaze, entryIdx, exitIdx);
-        mPanel->setStats("BFS完成", result.steps, result.turns, result.totalCost, 1);
-        break;
-    case 2: // 0-1 BFS
-        result = bfsFindFewestTurnsPath(mMaze, entryIdx, exitIdx);
-        mPanel->setStats("0-1 BFS完成", result.steps, result.turns, result.totalCost, 1);
-        break;
-    case 3: // Dijkstra
-        result = dijkstraFindPath(mMaze, entryIdx, exitIdx);
-        mPanel->setStats("Dijkstra完成", result.steps, result.turns, result.totalCost, 1);
-        break;
-    case 4: // A*
-        result = astarFindPath(mMaze, entryIdx, exitIdx);
-        mPanel->setStats("A*完成", result.steps, result.turns, result.totalCost, 1);
-        break;
+        case 1: // BFS
+            result = bfsFindShortestPath(mMaze, entryIdx, exitIdx);
+            mPanel->setStats("BFS完成", result.steps, result.turns, result.totalCost, 1);
+            break;
+        case 2: // 0-1 BFS
+            result = bfsFindFewestTurnsPath(mMaze, entryIdx, exitIdx);
+            mPanel->setStats("0-1 BFS完成", result.steps, result.turns, result.totalCost, 1);
+            break;
+        case 3: // Dijkstra
+            result = dijkstraFindPath(mMaze, entryIdx, exitIdx);
+            mPanel->setStats("Dijkstra完成", result.steps, result.turns, result.totalCost, 1);
+            break;
+        case 4: // A*
+            result = astarFindPath(mMaze, entryIdx, exitIdx);
+            mPanel->setStats("A*完成", result.steps, result.turns, result.totalCost, 1);
+            break;
+        }
     }
 
     if (result.points.empty()) {
