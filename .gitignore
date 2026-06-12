@@ -15,3 +15,10 @@ qt-mingw-libs/
 __pycache__/
 *.pyc
 translations/
+
+# Personal files — do not push to GitHub
+generate_report.py
+*.docx
+*.pdf
+.claude/
+.vscode/
