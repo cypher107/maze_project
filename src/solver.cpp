@@ -12,7 +12,8 @@ static const int DY[] = {0, 0, -1, 1};
 
 int dfsFindAllPathsCallback(const Maze& maze,
                              std::function<void(const Path&)> onPathFound,
-                             int entryIndex, int exitIndex, int maxPaths) {
+                             int entryIndex, int exitIndex,
+                             int maxPaths, int maxStates) {
     const auto& entries = maze.getEntries();
     const auto& exits = maze.getExits();
     if (entries.empty() || exits.empty()) return 0;
@@ -27,6 +28,7 @@ int dfsFindAllPathsCallback(const Maze& maze,
     }
 
     int pathCount = 0;
+    int statesVisited = 0;
     int rows = maze.getRows(), cols = maze.getCols();
 
     // Iterative DFS state: (x, y, direction_index)
@@ -41,8 +43,9 @@ int dfsFindAllPathsCallback(const Maze& maze,
     stk.push_back({start.x, start.y, 0});
     visited[start.x][start.y] = true;
     current.points.push_back(start);
+    statesVisited++;
 
-    while (!stk.empty() && pathCount < maxPaths) {
+    while (!stk.empty() && pathCount < maxPaths && statesVisited < maxStates) {
         State& top = stk.back();
         int x = top.x, y = top.y;
 
@@ -65,7 +68,7 @@ int dfsFindAllPathsCallback(const Maze& maze,
 
         // Try next direction
         bool moved = false;
-        while (top.dir < 4 && !moved) {
+        while (top.dir < 4 && !moved && statesVisited < maxStates) {
             int nx = x + DX[top.dir];
             int ny = y + DY[top.dir];
             top.dir++;
@@ -73,6 +76,7 @@ int dfsFindAllPathsCallback(const Maze& maze,
                 visited[nx][ny] = true;
                 current.points.push_back(Point(nx, ny));
                 stk.push_back({nx, ny, 0});
+                statesVisited++;
                 moved = true;
             }
         }
@@ -89,12 +93,13 @@ int dfsFindAllPathsCallback(const Maze& maze,
 }
 
 std::vector<Path> dfsFindAllPaths(const Maze& maze,
-                                   int entryIndex, int exitIndex, int maxPaths) {
+                                   int entryIndex, int exitIndex,
+                                   int maxPaths, int maxStates) {
     std::vector<Path> allPaths;
     allPaths.reserve(maxPaths);
     dfsFindAllPathsCallback(maze, [&](const Path& p) {
         allPaths.push_back(p);
-    }, entryIndex, exitIndex, maxPaths);
+    }, entryIndex, exitIndex, maxPaths, maxStates);
     return allPaths;
 }
 

@@ -632,7 +632,7 @@ void MainWindow::runAlgorithm(int algo, int entryIdx, int exitIdx, bool animated
     } else {
         switch (algo) {
         case 0: { // DFS
-            std::vector<Path> all = dfsFindAllPaths(mMaze, entryIdx, exitIdx, 500);
+            std::vector<Path> all = dfsFindAllPaths(mMaze, entryIdx, exitIdx, 50);
             if (!all.empty()) {
                 result = all[0];
                 for (const auto& p : all) {
