@@ -35,9 +35,9 @@ public:
     explicit MazeCanvas(QWidget* parent = nullptr);
 
     void setMaze(const Maze* maze);
-    void setPath(const Path* path, const QColor& color = Qt::red);
+    void setPath(const Path& path, const QColor& color = Qt::red);
     void clearAllPaths();
-    void addComparePath(const Path* path, const QColor& color, const QString& label);
+    void addComparePath(const Path& path, const QColor& color, const QString& label);
 
     enum EditMode { None, SetTerrain, SetEntry, SetExit, SetCheckpoint };
     void setEditMode(EditMode mode);
@@ -61,7 +61,7 @@ protected:
 
 private:
     const Maze* mMaze;
-    QVector<QPair<const Path*, QColor>> mPaths;
+    QVector<QPair<Path, QColor>> mPaths;
     QStringList mPathLabels;
     EditMode mEditMode;
     Terrain mActiveTerrain;

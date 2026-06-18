@@ -35,9 +35,9 @@ void MazeCanvas::setMaze(const Maze* maze) {
     update();
 }
 
-void MazeCanvas::setPath(const Path* path, const QColor& color) {
+void MazeCanvas::setPath(const Path& path, const QColor& color) {
     clearAllPaths();
-    if (path) mPaths.append({path, color});
+    if (!path.points.empty()) mPaths.append({path, color});
     update();
 }
 
@@ -48,8 +48,8 @@ void MazeCanvas::clearAllPaths() {
     update();
 }
 
-void MazeCanvas::addComparePath(const Path* path, const QColor& color, const QString& label) {
-    if (path && !path->points.empty()) {
+void MazeCanvas::addComparePath(const Path& path, const QColor& color, const QString& label) {
+    if (!path.points.empty()) {
         mPaths.append({path, color});
         mPathLabels.append(label);
     }
@@ -148,13 +148,13 @@ void MazeCanvas::paintEvent(QPaintEvent*) {
 
     // Draw path overlays - collect path cells per path
     for (int pi = 0; pi < mPaths.size(); pi++) {
-        const Path* path = mPaths[pi].first;
-        if (!path || path->points.empty()) continue;
+        const Path& path = mPaths[pi].first;
+        if (path.points.empty()) continue;
         QColor col = mPaths[pi].second;
 
         // Build set for this path
-        for (size_t k = 0; k < path->points.size(); k++) {
-            const Point& pt = path->points[k];
+        for (size_t k = 0; k < path.points.size(); k++) {
+            const Point& pt = path.points[k];
             int cx = pt.y * mCellSize + mCellSize / 2;
             int cy = pt.x * mCellSize + mCellSize / 2;
 
@@ -166,13 +166,13 @@ void MazeCanvas::paintEvent(QPaintEvent*) {
         }
 
         // Draw line segments between consecutive points
-        if (path->points.size() > 1) {
+        if (path.points.size() > 1) {
             QPen linePen(col);
             linePen.setWidth(std::max(1, mCellSize / 20));
             p.setPen(linePen);
-            for (size_t k = 0; k < path->points.size() - 1; k++) {
-                const Point& a = path->points[k];
-                const Point& b = path->points[k + 1];
+            for (size_t k = 0; k < path.points.size() - 1; k++) {
+                const Point& a = path.points[k];
+                const Point& b = path.points[k + 1];
                 int ax = a.y * mCellSize + mCellSize / 2;
                 int ay = a.x * mCellSize + mCellSize / 2;
                 int bx = b.y * mCellSize + mCellSize / 2;
@@ -592,7 +592,7 @@ void MainWindow::onRunSolver(int algorithm, int entryIdx, int exitIdx, bool anim
         // Compare mode — 有关卡时统一用关卡求解
         if (!mMaze.getCheckpoints().empty()) {
             Path cpPath = solveOptimalCheckpoints(mMaze, entryIdx, exitIdx);
-            mCanvas->addComparePath(&cpPath, QColor(233, 69, 96), "关卡最优路径");
+            mCanvas->addComparePath(cpPath, QColor(233, 69, 96), "关卡最优路径");
             mCanvas->update();
             mPanel->setStats("关卡对比完成",
                 cpPath.steps, cpPath.turns, cpPath.totalCost, 1);
@@ -605,10 +605,10 @@ void MainWindow::onRunSolver(int algorithm, int entryIdx, int exitIdx, bool anim
         Path dijPath = dijkstraFindPath(mMaze, entryIdx, exitIdx);
         Path aPath = astarFindPath(mMaze, entryIdx, exitIdx);
 
-        mCanvas->addComparePath(&bfsPath, QColor(233, 69, 96), "BFS最短");
-        mCanvas->addComparePath(&turnsPath, QColor(78, 204, 163), "最少转弯");
-        mCanvas->addComparePath(&dijPath, QColor(240, 165, 0), "Dijkstra");
-        mCanvas->addComparePath(&aPath, QColor(83, 52, 131), "A*");
+        mCanvas->addComparePath(bfsPath, QColor(233, 69, 96), "BFS最短");
+        mCanvas->addComparePath(turnsPath, QColor(78, 204, 163), "最少转弯");
+        mCanvas->addComparePath(dijPath, QColor(240, 165, 0), "Dijkstra");
+        mCanvas->addComparePath(aPath, QColor(83, 52, 131), "A*");
         mCanvas->update();
 
         mPanel->setStats("对比完成",
@@ -670,7 +670,7 @@ void MainWindow::runAlgorithm(int algo, int entryIdx, int exitIdx, bool animated
     mCurrentPath = result;
 
     if (animated) {
-        mCanvas->setPath(nullptr);
+        // clearAllPaths already done above; start animation fresh
         QColor col = (algo == 3 || algo == 4) ? QColor(240, 165, 0)
                     : (algo == 2) ? QColor(78, 204, 163)
                     : QColor(233, 69, 96);
@@ -680,7 +680,7 @@ void MainWindow::runAlgorithm(int algo, int entryIdx, int exitIdx, bool animated
         QColor col = (algo == 3 || algo == 4) ? QColor(240, 165, 0)
                     : (algo == 2) ? QColor(78, 204, 163)
                     : QColor(233, 69, 96);
-        mCanvas->setPath(&result, col);
+        mCanvas->setPath(result, col);
         statusBar()->showMessage(QString("求解完成 - 步数:%1 转弯:%2 代价:%3")
             .arg(result.steps).arg(result.turns).arg(result.totalCost));
     }
@@ -778,7 +778,7 @@ void MainWindow::onCellClicked(int x, int y) {
 
 void MainWindow::onAnimationFinished() {
     QColor col = (mEditMode == 0) ? QColor(233, 69, 96) : QColor(240, 165, 0);
-    mCanvas->setPath(&mCurrentPath, col);
+    mCanvas->setPath(mCurrentPath, col);
     statusBar()->showMessage(QString("求解完成 - 步数:%1 转弯:%2 代价:%3")
         .arg(mCurrentPath.steps).arg(mCurrentPath.turns).arg(mCurrentPath.totalCost));
 }
